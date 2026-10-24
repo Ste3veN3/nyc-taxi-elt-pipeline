@@ -1,56 +1,47 @@
 # NYC Taxi ELT Pipeline (2025)
 
-Proyecto desarrollado para la materia **Fundamentos de Ciencia de Datos** de la **Universidad San Francisco de Quito**.
+Proyecto desarrollado para la materia **Fundamentos de Ciencia de Datos** de la **Universidad San Francisco de Quito** (Maestría en Ciencia de Datos).
 
-Este proyecto implementa una arquitectura para la ingesta, almacenamiento, transformación y modelado de datos históricos de viajes de taxi de Nueva York en el año 2025.
-
-La solución utiliza **Docker Compose** para desplegar un entorno reproducible con **Mage AI** como orquestador, **PostgreSQL** como data warehouse y **pgAdmin** como herramienta de inspección.
+Implementa una arquitectura **ELT** para la ingesta, almacenamiento, transformación y modelado dimensional de los datos históricos de viajes de taxi de Nueva York del año 2025. Todo el entorno se despliega con **Docker Compose**, usa **Mage AI** como orquestador, **PostgreSQL** como data warehouse y **pgAdmin** como herramienta de inspección.
 
 ---
 
-# Objetivo del proyecto
+## Objetivo
 
-Construir un pipeline de ingeniería de datos completamente reproducible que permita:
+Construir un pipeline de ingeniería de datos reproducible que permita:
 
 * ingerir datos históricos de taxis de Nueva York
 * almacenar los datos crudos en una capa **raw**
-* transformar los datos a una capa **clean**
-* implementar un **modelo dimensional**
-* automatizar pipelines mediante triggers
-* permitir validación mediante pgAdmin
+* transformarlos hacia una capa **clean**
+* implementar un **modelo dimensional** (esquema estrella)
+* automatizar la ejecución de los pipelines mediante triggers
+* validar los resultados mediante consultas SQL en pgAdmin
 
-El proyecto sigue una arquitectura **ETL (Extract-Transform-Load)**.
-
----
-
-# Fuente de datos
-
-Dataset público de viajes de taxi de Nueva York.
-
-Fuente:
-
-https://d37ci6vzurychx.cloudfront.net/trip-data/
-
-Formato de los archivos:
-
-Parquet
-
-Ejemplo de archivo:
-
-yellow_tripdata_2025-01.parquet
-
-El pipeline permite ingerir la información del año 2025
+El proyecto sigue una arquitectura **ELT (Extract-Load-Transform)**: los datos se cargan primero en la capa raw y se transforman después dentro de PostgreSQL hacia la capa clean.
 
 ---
 
-# Arquitectura del sistema
+## Fuente de datos
 
-La arquitectura del proyecto está compuesta por los siguientes componentes:
+Dataset público de viajes de taxi de Nueva York (NYC TLC Trip Record Data).
 
-* fuente de datos NY Taxi
-* Mage (orquestación de pipelines)
-* PostgreSQL (data warehouse)
-* pgAdmin (inspección y validación)
+* Fuente: https://d37ci6vzurychx.cloudfront.net/trip-data/
+* Formato: Parquet
+* Ejemplo de archivo: `yellow_tripdata_2025-01.parquet`
+* Periodo ingerido: año 2025
+
+---
+
+## Arquitectura del sistema
+
+![Diagrama de arquitectura](docs/architecture_diagram.png)
+
+Componentes:
+
+* **NY Taxi Dataset**: fuente de datos (archivos Parquet)
+* **Mage AI**: orquestación de pipelines
+* **PostgreSQL**: data warehouse (schemas `raw` y `clean`)
+* **pgAdmin**: inspección y validación
 
 Flujo de datos:
 
@@ -77,195 +68,140 @@ NY Taxi Dataset
  └ fact_trips
         ↓
  pgAdmin
- (analysis & validation)
-```
-
-El diagrama de arquitectura se encuentra en:
-
-```
-docs/architecture_diagram.png
+ (análisis y validación)
 ```
 
 ---
 
-# Tecnologías utilizadas
+## Tecnologías utilizadas
 
-* Docker
-* Docker Compose
-* Python
+* Docker y Docker Compose
+* Python y Pandas
 * SQL
 * Mage AI
 * PostgreSQL
 * pgAdmin
-* Pandas
 
 ---
 
-# Estructura del proyecto
+## Estructura del proyecto
 
 ```
-pset-2-sq/
-│
+nyc-taxi-elt-pipeline/
 ├── docker-compose.yml
-├── DockerFile
+├── Dockerfile
 ├── README.md
-├── requirimients.txt
+├── requirements.txt
+├── .env.example
 ├── notebooks/
-    └── EDA.ipynb
-    └── ingest-data.py
+│   ├── EDA.ipynb
+│   └── ingest-data.py
 ├── data-orquestador/
-    └── mage_data
-    └── orquestador
-├── docs/
-│   └── architecture_diagram.png
-    └── modelo_dimensional.docx
+│   ├── mage_data/
+│   └── orquestador/
+└── docs/
+    ├── architecture_diagram.png
+    ├── modelo_dimensional.docx
     └── evidencias_visuales.docx
 ```
 
 ---
 
-# Cómo levantar el entorno
+## Cómo ejecutar el proyecto
 
-Primero asegúrese de tener instalado:
+### 1. Requisitos
 
 * Docker
 * Docker Compose
 
-Luego ejecute el siguiente comando desde la raíz del proyecto:
+### 2. Configuración
+
+Copia el archivo de ejemplo de variables de entorno y ajusta los valores:
+
+```
+cp .env.example .env
+```
+
+El archivo `.env` contiene las credenciales de acceso a pgAdmin y PostgreSQL. No se incluye en el repositorio.
+
+### 3. Levantar el entorno
+
+Desde la raíz del proyecto:
 
 ```
 docker compose up --build
 ```
 
-Esto iniciará automáticamente los siguientes servicios:
+Esto inicia los servicios de PostgreSQL, Mage y pgAdmin dentro de la misma red Docker.
 
-* PostgreSQL
-* Mage
-* pgAdmin
+### 4. Acceso a los servicios
 
-Los contenedores estarán conectados dentro de la misma red Docker.
+| Servicio | URL |
+|----------|-----|
+| Mage | http://localhost:6789 |
+| pgAdmin | http://localhost:9000 |
 
----
+### 5. Ejecutar los pipelines
 
-# Acceso a los servicios
-
-## Mage
-
-URL:
-
-```
-http://localhost:6789
-```
-
-Aquí se pueden visualizar y ejecutar los pipelines del proyecto.
+1. Abre Mage en `http://localhost:6789`.
+2. Ejecuta `raw_ingestion_pipeline` (o espera a que lo dispare `trigger_pipeline_raw`).
+3. Una vez cargada la capa raw, ejecuta `clean_pipeline`.
+4. Valida los resultados en pgAdmin con las consultas de la sección de validación.
 
 ---
 
-## pgAdmin
+## Pipelines de datos
 
-URL:
+El proyecto implementa dos pipelines independientes en Mage.
 
-```
-http://localhost:9000
-```
+### 1. Raw Ingestion Pipeline
 
-pgAdmin permite explorar las tablas dentro de PostgreSQL y validar los resultados del pipeline.
-
----
-
-# Pipelines de datos
-
-El proyecto implementa dos pipelines separados en Mage.
-
-## 1. Raw Ingestion Pipeline
-
-Nombre del pipeline:
-
-```
-raw_ingestion_pipeline
-```
+Nombre: `raw_ingestion_pipeline`
 
 Responsabilidades:
 
-* descargar datos del dataset NY Taxi
-* leer archivos Parquet
-* cargar datos en PostgreSQL
-* crear el schema **raw** si no existe
+* descargar los datos del dataset NY Taxi
+* leer los archivos Parquet
+* cargar los datos en PostgreSQL
+* crear el schema `raw` si no existe
 
-Tabla resultante:
-
-```
-raw.ny_taxi_trips
-```
+Tabla resultante: `raw.ny_taxi_trips`
 
 Características:
 
-* ingesta de múltiples años
 * reejecución idempotente
-* mínima transformación de datos
+* mínima transformación de los datos
 
----
+### 2. Clean Transformation Pipeline
 
-## 2. Clean Transformation Pipeline
-
-Nombre del pipeline:
-
-```
-clean_pipeline
-```
+Nombre: `clean_pipeline`
 
 Responsabilidades:
 
-* leer datos desde `raw.ny_taxi_trips`
+* leer los datos desde `raw.ny_taxi_trips`
 * limpiar datos inconsistentes
 * estandarizar columnas
 * validar tipos de datos
 * construir el modelo dimensional
 
-Resultados almacenados en el schema:
-
-```
-clean
-```
+Resultado: tablas del schema `clean`.
 
 ---
 
-# Triggers y automatización
+## Triggers y automatización
 
-Los pipelines utilizan triggers configurados en Mage.
+Los pipelines se automatizan con triggers configurados en Mage:
 
-Triggers implementados:
+* `trigger_pipeline_raw`: ejecuta la ingesta de datos crudos.
+* `Ejecucion Clean Pipeline`: ejecuta el pipeline de transformación una vez cargada la capa raw.
 
-```
-trigger_pipeline_raw
-```
-
-Este trigger ejecuta la ingesta de datos crudos.
-
-
-Posteriormente se ejecuta el pipeline de transformación denominado: 
-
-```
-Ejecucion Clean Pipeline
-```
-
-que depende de los datos cargados en la capa raw.
-
-Esto permite automatizar el flujo completo de datos.
+Esto automatiza el flujo completo de datos, de la ingesta al modelo dimensional.
 
 ---
 
-# Acceder a pgAdmin
-Correo: bryanste3ven@gmail.com
-Contraseña: root
+## Manejo de secretos
 
-# Secrets y configuración
-
-Las credenciales de conexión a PostgreSQL no están hardcodeadas.
-
-Se utilizan **Mage Secrets** para almacenar información sensible.
-
-Configuración utilizada:
+Las credenciales de conexión a PostgreSQL no están escritas en el código. Se utilizan **Mage Secrets**:
 
 ```
 POSTGRES_DBNAME
@@ -286,103 +222,48 @@ POSTGRES_HOST: {{ mage_secret_var('pg_host') }}
 POSTGRES_PORT: {{ mage_secret_var('pg_port') }}
 ```
 
-Esto permite mantener el proyecto seguro y reproducible.
-
 ---
 
-# Modelo dimensional
+## Modelo dimensional
 
-La capa **clean** implementa un modelo dimensional tipo **Star Schema**.
+La capa `clean` implementa un esquema estrella (Star Schema).
 
-## Tabla de hechos
+### Tabla de hechos: `fact_trips`
 
-```
-fact_trips
-```
+Granularidad: un registro representa **un viaje individual de taxi**.
 
-Granularidad:
+Métricas:
 
-Un registro representa **un viaje individual de taxi**.
+* `trip_distance`
+* `fare`
+* `tip`
+* `tolls`
+* `total_amount`
+* `trip_duration`
 
-Métricas incluidas:
+### Dimensiones
 
-* trip_distance
-* fare
-* tip
-* tolls
-* total_amount
-* trip_duration
+* `dim_vendor`: proveedor del servicio de taxi
+* `dim_payment_type`: tipo de pago utilizado
+* `dim_pickup_location`: ubicación de inicio del viaje
+* `dim_dropoff_location`: ubicación de fin del viaje
 
----
-
-## Dimensiones
-
-### dim_vendor
-
-Información sobre el proveedor del taxi.
-
----
-
-### dim_payment_type
-
-Tipo de pago utilizado en el viaje.
-
----
-
-### dim_pickup_location
-
-Ubicación donde inicia el viaje.
-
----
-
-### dim_dropoff_location
-
-Ubicación donde termina el viaje.
-
----
-
-# Relaciones del modelo
+### Relaciones
 
 ```
 fact_trips
 │
-├── vendor_key → dim_vendor
-├── payment_type_key → dim_payment_type
-├── pickup_location_key → dim_pickup_location
+├── vendor_key           → dim_vendor
+├── payment_type_key     → dim_payment_type
+├── pickup_location_key  → dim_pickup_location
 └── dropoff_location_key → dim_dropoff_location
 ```
 
----
-
-# Validación de resultados en PostgreSQL
-
-Para validar los resultados del pipeline se pueden ejecutar consultas en pgAdmin.
-
-Ejemplo:
-
-Contar registros en raw:
-
-```sql
-SELECT COUNT(*) FROM raw.ny_taxi_trips;
-```
-
-Ver datos en clean:
-
-```sql
-SELECT * FROM clean.fact_trips LIMIT 10;
-```
-
-Consultar dimensiones:
-
-```sql
-SELECT * FROM clean.dim_vendor;
-```
+El detalle del diseño está en `docs/modelo_dimensional.docx`.
 
 ---
 
-# Validaciones aplicadas en la capa clean
-
-Durante el pipeline de transformación se aplican validaciones como:
+## Validaciones aplicadas en la capa clean
 
 * manejo de valores nulos
 * estandarización de nombres de columnas
@@ -391,34 +272,52 @@ Durante el pipeline de transformación se aplican validaciones como:
 * validación de coherencia entre pickup y dropoff
 * filtrado de distancias o montos negativos
 
-Esto garantiza que los datos de la capa clean sean adecuados para análisis.
+---
+
+## Validación de resultados en PostgreSQL
+
+Consultas de ejemplo para ejecutar en pgAdmin:
+
+```sql
+-- Contar registros en la capa raw
+SELECT COUNT(*) FROM raw.ny_taxi_trips;
+
+-- Ver datos de la tabla de hechos
+SELECT * FROM clean.fact_trips LIMIT 10;
+
+-- Consultar una dimensión
+SELECT * FROM clean.dim_vendor;
+```
 
 ---
 
-# Evidencia visual
+## Evidencia visual
 
-El proyecto incluye capturas en el repositorio que muestran:
+El archivo `docs/evidencias_visuales.docx` incluye capturas de:
 
 * contenedores corriendo en Docker
 * pipelines visibles en Mage
 * triggers configurados
-* tablas en schema raw
-* tablas en schema clean
+* tablas en los schemas `raw` y `clean`
 * consultas ejecutadas en pgAdmin
 
 ---
 
-# Conclusión
+## Conclusión
 
-Este proyecto demuestra la construcción de una arquitectura moderna de ingeniería de datos utilizando herramientas open source.
-
-La solución implementa buenas prácticas como:
+Este proyecto demuestra la construcción de una arquitectura moderna de ingeniería de datos con herramientas open source, aplicando buenas prácticas como:
 
 * separación entre capas raw y clean
-* pipelines independientes
-* modelo dimensional
-* orquestación con Mage
+* pipelines independientes y automatizados con triggers
+* modelo dimensional en esquema estrella
+* orquestación con Mage AI
 * manejo seguro de credenciales
 * entorno reproducible con Docker Compose
 
 ---
+
+## Autor
+
+**Steeven Quezada**
+Maestría en Ciencia de Datos, Universidad San Francisco de Quito (USFQ)
+GitHub: [github.com/Ste3veN3](https://github.com/Ste3veN3)
